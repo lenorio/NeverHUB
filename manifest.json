@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "scripts": [
+    {
+      "id": "tap-incremental",
+      "name": "Tap Incremental",
+      "version": "1.0.0",
+      "description": "Тапы, руны, классы, улучшения, фрукты, руда и продажа",
+      "placeIds": [82103875404639],
+      "file": "TapIncremental_Automator.luau",
+      "runtimeKey": "TapIncrementalAutomator"
+    }
+  ]
+}
