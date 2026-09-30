@@ -5,7 +5,7 @@
       "id": "tap-incremental",
       "name": "Tap Incremental",
       "version": "1.0.0",
-      "description": "Тапы, руны, классы, улучшения, фрукты, руда и продажа",
+      "description": "Auto taps, runes, classes, upgrades, fruit collection, mining and selling",
       "placeIds": [82103875404639],
       "file": "TapIncremental_Automator.luau",
       "runtimeKey": "TapIncrementalAutomator"

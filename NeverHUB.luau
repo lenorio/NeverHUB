@@ -12,10 +12,16 @@ local runtime = {alive = true, loading = false, window = nil, catalog = nil, sel
 environment.NeverHUB = runtime
 
 local function stop()
-    if not runtime.alive then return end
     runtime.alive = false
+    runtime.loading = false
     local window = runtime.window
     runtime.window = nil
+    runtime.catalog = nil
+    runtime.selected = nil
+    runtime.Load = nil
+    runtime.Refresh = nil
+    runtime.FindScript = nil
+    if environment.NeverHUB == runtime then environment.NeverHUB = nil end
     if window then pcall(function() window:Destroy() end) end
 end
 runtime.Stop = stop
@@ -36,12 +42,12 @@ local function download(url, cachePath, validate)
     local validCache = cached and type(saved) == "string" and #saved > 0
     if validCache and validate then validCache = pcall(validate, saved) end
     if validCache then return saved, true end
-    error("Не удалось загрузить " .. url .. ": " .. tostring(content))
+    error("Failed to download " .. url .. ": " .. tostring(content))
 end
 
 local function compile(content, name)
     local chunk, err = loadstring(content, "@NeverHUB/" .. name)
-    if not chunk then error("Ошибка в " .. name .. ": " .. tostring(err)) end
+    if not chunk then error("Error in " .. name .. ": " .. tostring(err)) end
     return chunk
 end
 
@@ -49,7 +55,8 @@ local WindUI
 local loadedUI, uiError = pcall(function()
     local source = download(UI_URL, "NeverHUB/WindUI.luau", function(text) compile(text, "WindUI") end)
     WindUI = compile(source, "WindUI")()
-    assert(type(WindUI) == "table", "Библиотека интерфейса не загрузилась")
+    assert(type(WindUI) == "table", "The UI library failed to load")
+    WindUI:SetLanguage("en")
 end)
 if not loadedUI then
     warn("NeverHUB: " .. tostring(uiError))
@@ -62,15 +69,15 @@ local function notify(title, text)
 end
 
 local function validateCatalog(catalog)
-    assert(type(catalog) == "table" and catalog.schemaVersion == 1 and type(catalog.scripts) == "table", "Неверный формат каталога")
+    assert(type(catalog) == "table" and catalog.schemaVersion == 1 and type(catalog.scripts) == "table", "Invalid catalog format")
     local ids = {}
     for _, entry in catalog.scripts do
-        assert(type(entry) == "table" and type(entry.id) == "string" and entry.id:match("^[%w_-]+$"), "Неверный ID скрипта")
-        assert(not ids[entry.id], "Повторяющийся ID скрипта: " .. entry.id)
+        assert(type(entry) == "table" and type(entry.id) == "string" and entry.id:match("^[%w_-]+$"), "Invalid script ID")
+        assert(not ids[entry.id], "Duplicate script ID: " .. entry.id)
         ids[entry.id] = true
-        assert(type(entry.name) == "string" and type(entry.file) == "string", "Не указаны имя или файл скрипта")
-        assert(entry.file:match("^[%w_./-]+$") and not entry.file:find("..", 1, true) and entry.file:sub(1, 1) ~= "/", "Неверный путь к скрипту")
-        assert(type(entry.placeIds) == "table" or type(entry.universeIds) == "table", "Не указана игра для " .. entry.id)
+        assert(type(entry.name) == "string" and type(entry.file) == "string", "Missing script name or file")
+        assert(entry.file:match("^[%w_./-]+$") and not entry.file:find("..", 1, true) and entry.file:sub(1, 1) ~= "/", "Invalid script path")
+        assert(type(entry.placeIds) == "table" or type(entry.universeIds) == "table", "Missing game IDs for " .. entry.id)
     end
 end
 
@@ -104,15 +111,13 @@ local function launch(forceReload)
     local active = activeScript(entry)
     if active and not forceReload then
         if active.window then pcall(function() active.window:Open() end) end
-        notify("Скрипт уже работает", entry.name)
+        stop()
         return
     end
     runtime.loading = true
     task.spawn(function()
-        local cached = false
         local ok, err = pcall(function()
-            local source
-            source, cached = download(BASE_URL .. entry.file, "NeverHUB/" .. entry.id .. ".luau", function(text) compile(text, entry.file) end)
+            local source = download(BASE_URL .. entry.file, "NeverHUB/" .. entry.id .. ".luau", function(text) compile(text, entry.file) end)
             local chunk = compile(source, entry.file)
             if not runtime.alive then return end
             chunk()
@@ -120,12 +125,10 @@ local function launch(forceReload)
         runtime.loading = false
         if not runtime.alive then return end
         if ok then
-            runtime.loadedScript = entry.id
-            notify("Скрипт запущен", entry.name .. (cached and " · локальная копия" or ""))
-            if runtime.window then pcall(function() runtime.window:Close() end) end
+            stop()
         else
             warn("NeverHUB: " .. tostring(err))
-            notify("Не удалось запустить", tostring(err))
+            notify("Could not load script", tostring(err))
         end
     end)
 end
@@ -149,30 +152,30 @@ local function showCatalog()
     window:OnDestroy(function()
         if runtime.window == window then
             runtime.window = nil
-            runtime.alive = false
+            stop()
         end
     end)
     window:SetToggleKey(Enum.KeyCode.RightShift)
-    local current = window:Tab({Title = "Текущая игра", Icon = "gamepad-2"})
+    local current = window:Tab({Title = "Current game", Icon = "gamepad-2"})
     local entry = runtime.selected
     if entry then
         current:Button({
-            Title = activeScript(entry) and "Открыть " .. entry.name or "Запустить " .. entry.name,
+            Title = activeScript(entry) and "Open " .. entry.name or "Load " .. entry.name,
             Desc = tostring(entry.description or "") .. " · v" .. tostring(entry.version or "1"),
             Icon = "play",
             Callback = function() launch(false) end,
         })
-        current:Button({Title = "Перезапустить скрипт", Desc = "Загрузить текущую версию с GitHub", Icon = "refresh-cw",
+        current:Button({Title = "Reload script", Desc = "Load the latest version from GitHub", Icon = "refresh-cw",
             Callback = function() launch(true) end})
     end
-    current:Button({Title = "Обновить каталог", Desc = entry and "Проверить обновления на GitHub" or "Для этого плейса скрипт пока не найден", Icon = "refresh-cw",
+    current:Button({Title = "Refresh catalog", Desc = entry and "Check for updates" or "No script is available for this game yet", Icon = "refresh-cw",
         Callback = function() runtime.Refresh(false) end})
-    current:Button({Title = "Закрыть хаб", Desc = "Запущенный игровой скрипт продолжит работать", Icon = "x", Callback = stop})
-    local catalogTab = window:Tab({Title = "Все игры", Icon = "list"})
+    current:Button({Title = "Unload hub", Desc = "Your game script will keep running", Icon = "x", Callback = stop})
+    local catalogTab = window:Tab({Title = "All games", Icon = "list"})
     for _, item in runtime.catalog.scripts do
         catalogTab:Button({Title = item.name, Desc = tostring(item.description or "") .. " · v" .. tostring(item.version or "1"),
             Callback = function()
-                if item == runtime.selected then launch(false) else notify("Другая игра", "Этот скрипт доступен после входа в " .. item.name) end
+                if item == runtime.selected then launch(false) else notify("Join the game first", "Join " .. item.name .. " to load this script") end
             end})
     end
     window:SelectTab(current.Index)
@@ -198,18 +201,18 @@ local function refresh(offer)
         if not runtime.alive then return end
         if not ok then
             warn("NeverHUB: " .. tostring(err))
-            notify("Каталог недоступен", tostring(err))
+            notify("Catalog unavailable", tostring(err))
             return
         end
         local entry = runtime.selected
         if offer and entry and not activeScript(entry) then
-            runtime.window:Dialog({Title = "Найден скрипт: " .. entry.name, Content = "Запустить скрипт для этой игры?",
+            runtime.window:Dialog({Title = entry.name .. " is supported", Content = "Load the script for this game? The hub will unload after the script starts.",
                 Buttons = {
-                    {Title = "Позже", Variant = "Secondary", Callback = function() end},
-                    {Title = "Запустить", Variant = "Primary", Callback = function() launch(false) end},
+                    {Title = "Not now", Variant = "Secondary", Callback = function() end},
+                    {Title = "Load script", Variant = "Primary", Callback = function() launch(false) end},
                 }})
         elseif not entry then
-            notify("Игра определена", "Скрипта для плейса " .. tostring(game.PlaceId) .. " пока нет в каталоге")
+            notify("Game detected", "No script is available for this game yet")
         end
     end)
 end

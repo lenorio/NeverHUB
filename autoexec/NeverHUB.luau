@@ -17,7 +17,7 @@ if not chunk then
     end
 end
 if not chunk then
-    warn("NeverHUB: загрузка не удалась: " .. tostring(err or source))
+    warn("NeverHUB: download failed: " .. tostring(err or source))
     return
 end
 local ran, runError = pcall(chunk)

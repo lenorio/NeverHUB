@@ -1,51 +1,53 @@
 # NeverHUB
 
-Общий хаб Luau-скриптов для Roblox. Он определяет текущую игру по `PlaceId`, находит подходящий скрипт в каталоге и предлагает запустить его. Запуск происходит по кнопке; функции автоматизатора включаются отдельно в его панели.
+A Roblox script hub that detects your current game and offers to load a matching script. Click **Load script** to start it, then enable the features you want in the game script's panel.
 
-## Запуск
+The hub unloads after a script starts successfully. Opening an already running script also unloads the hub. If loading fails, the hub stays open so you can retry.
+
+## Getting started
 
 ```luau
 loadstring(game:HttpGet("https://raw.githubusercontent.com/lenorio/NeverHUB/main/NeverHUB.luau"))()
 ```
 
-Для запуска после каждого инжекта скопируйте файл [autoexec/NeverHUB.luau](autoexec/NeverHUB.luau) в папку **AutoExec** Real. AutoExec запускает Luau после подключения исполнителя к игре; сам исполнитель хаб не инжектит.
+To run the hub after every injection, copy [autoexec/NeverHUB.luau](autoexec/NeverHUB.luau) into Real's **AutoExec** folder. AutoExec runs after the executor attaches to Roblox; you still need to inject the executor yourself.
 
-**Right Shift** скрывает и показывает панель. Если скрипт уже работает, хаб открывает его панель; кнопка перезапуска загружает актуальную версию с GitHub. Закрытие хаба не останавливает игровой скрипт.
+**Right Shift** toggles the panel while the hub is running. **Unload hub** removes the hub without stopping your game script. To open the hub again after it unloads, run the loader above.
 
-## Поддерживаемые игры
+## Supported games
 
-| Игра | PlaceId | Скрипт |
+| Game | PlaceId | Script |
 | --- | --- | --- |
 | Tap Incremental | `82103875404639` | [TapIncremental_Automator.luau](TapIncremental_Automator.luau) |
 
-Tap Incremental: автоматические тапы, руны, классы, редкости, доступные улучшения, добыча руды, деревья, сбор фруктов телепортами, продажа руды и рыбы. Авторуны из любой точки используют короткий перенос к кнопке с возвратом. Подтверждены тапы, фрукты, добыча камня, продажа руды и Basic-руны; остальные действия требуют отдельной проверки в соответствующих зонах.
+Tap Incremental includes auto taps, runes, classes, rarities, available upgrades, mining, trees, fruit collection with teleports, and ore/fish selling. Rune purchases from a distance briefly move your character to the rune button and back. Taps, fruit collection, stone mining, ore selling, and Basic runes have been verified in game; other actions need separate checks in their respective zones.
 
-## Добавление новой игры
+## Adding a game
 
-1. Загрузите её `.luau`-скрипт в репозиторий.
-2. Добавьте запись в `manifest.json`:
+1. Upload the game's `.luau` script to this repository.
+2. Add an entry to `manifest.json`:
 
 ```json
 {
   "id": "example-game",
-  "name": "Название игры",
+  "name": "Example Game",
   "version": "1.0.0",
-  "description": "Возможности скрипта",
+  "description": "What the script can do",
   "placeIds": [123456789],
   "file": "ExampleGame.luau",
   "runtimeKey": "ExampleGameRuntime"
 }
 ```
 
-`id` должен быть уникальным. `runtimeKey` необязателен: это ключ в `getgenv()`, по которому хаб определяет запущенный скрипт (`alive`, `window`). Каждый игровой скрипт должен останавливать предыдущую копию при повторном запуске. При необходимости можно добавить `universeIds`: точное совпадение `PlaceId` имеет приоритет, затем проверяется `game.GameId`. Указывайте universe только если скрипт поддерживает все его плейсы.
+Use a unique `id`. The optional `runtimeKey` identifies the script's runtime in `getgenv()` through its `alive` and `window` fields. Each game script should stop its previous instance when loaded again. You can also specify `universeIds`: an exact `PlaceId` match takes priority, followed by `game.GameId`. Only use a universe ID when the script supports all places in that universe.
 
-Каталог обновляется при запуске хаба и по кнопке **Обновить каталог**. Загруженные файлы сохраняются в Workspace исполнителя, в папку `NeverHUB`; при временной ошибке сети используется сохранённая копия.
+The catalog updates when the hub starts and when you click **Refresh catalog**. Downloads are cached in the executor's Workspace under `NeverHUB`; valid cached files are used if GitHub is temporarily unavailable.
 
-## Файлы
+## Files
 
-- `NeverHUB.luau` — интерфейс, определение игры, предложение запуска и загрузка скриптов.
-- `manifest.json` — список игр и версии скриптов.
-- `autoexec/NeverHUB.luau` — загрузчик для Real AutoExec, с локальной копией на случай недоступности GitHub.
-- `TapIncremental_Automator.luau` — автоматизатор Tap Incremental.
+- `NeverHUB.luau` — game detection, catalog, load prompt, and script loading.
+- `manifest.json` — supported games and script versions.
+- `autoexec/NeverHUB.luau` — Real AutoExec loader with a cached fallback.
+- `TapIncremental_Automator.luau` — Tap Incremental automation.
 
-Интерфейс использует [WindUI](https://github.com/Footagesus/WindUI).
+The interface uses [WindUI](https://github.com/Footagesus/WindUI). Hub controls, messages, catalog descriptions, and documentation are in English.
